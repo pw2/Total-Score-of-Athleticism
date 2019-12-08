@@ -1,0 +1,173 @@
+---
+title: "Total Score of Athleticism - Report"
+author: "Patrick Ward"
+date: "12/8/2019"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+## Total Score of Athleticism
+
+Turner, et al. (2019). Total score of athleticism: Holistic athlete profiling to enhance decision-making. Strength Cond J.
+
+```{r setup, include=FALSE, warning = F}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(reshape)
+library(stringr)
+```
+
+## Get data
+
+```{r, echo = F, include = T}
+set.seed(3344)
+athlete <- as.factor(1:30)
+
+cmj <- c(round(rnorm(n = 10, mean = 30, sd = 4), 1), round(rnorm(n = 10, mean = 24, sd = 4), 1), round(rnorm(n = 10, mean = 33, sd = 2), 1))
+
+sprint_40 <- c(round(rnorm(n = 10, mean = 4.5, sd = .1), 2), round(rnorm(n = 10, mean = 4.9, sd = .2), 2), round(rnorm(n = 10, mean = 5, sd = .2), 2))
+
+bench <- c(round(rnorm(n = 10, mean = 20, sd = 4), 1), round(rnorm(n = 10, mean = 12, sd = 4), 1), round(rnorm(n = 10, mean = 30, sd = 4), 1))
+
+five_ten_five <- c(round(rnorm(n = 10, mean = 6.4, sd = .2), 2), round(rnorm(n = 10, mean = 6.7, sd = .2), 2), round(rnorm(n = 10, mean = 7.5, sd = .4), 2))
+
+
+df <- data.frame(athlete, cmj, sprint_40, bench, five_ten_five)
+df %>% head()
+```
+
+
+```{r echo = F, include = F}
+## z-score & t-score functions
+
+z_score <- function(x){
+  z = (x - mean(x, na.rm = T)) / sd(x, na.rm = T)
+}
+
+t_score <- function(x){
+  t = (x * 10) + 50
+}
+
+```
+
+
+```{r echo = F, include = F}
+
+## calculate the z-score
+df <- df %>%
+  mutate_if(is.numeric, list(z = z_score))
+
+df$sprint_40_z <- df$sprint_40_z * -1
+df$five_ten_five_z <- df$five_ten_five_z * -1
+
+## calculate the t-score
+df <- df %>%
+  mutate(cmj_t = t_score(cmj_z),
+         sprint_40_t = t_score(sprint_40_z),
+         bench_t = t_score(bench_z),
+         five_ten_five_t = t_score(five_ten_five_z))
+
+```
+
+
+```{r echo = F, include = F}
+
+## calculate TSA_z
+df$TSA_z <- apply(df[, 6:9], MARGIN = 1, FUN = mean)
+
+## calculate TSA_z
+df$TSA_t <- with(df, (TSA_z * 10) + 50)
+
+```
+
+
+## Test Performance Outcomes
+
+```{r echo = F, include = T}
+
+# Change data from a wide to long format
+df_long <- df %>% 
+    melt(., id = "athlete", measure.vars = c("cmj_z", "sprint_40_z", "bench_z", "five_ten_five_z"))
+
+# remove the _z
+df_long$Test <- str_sub(df_long$variable, end = -3)
+
+# Add indicator value
+df_long <- df_long %>% mutate("indicator" = ifelse(value > 0, "above avg", "below avg"))
+
+# plot
+df_long %>%
+  filter(athlete %in% c(3, 15, 22, 27)) %>%
+  ggplot(aes(x = Test, y = value)) +
+    geom_rect(aes(ymin = -1, ymax = 1), xmin = 0, xmax = Inf, fill = "light grey", alpha = 0.3) +
+    geom_col(aes(fill = indicator), alpha = 0.8) +
+    facet_wrap(~athlete)  +
+  scale_fill_manual(values = c("green", "red")) +
+  theme_light() +
+    theme(axis.text.x = element_text(face = "bold", size = 12, angle = 45, vjust = 1, hjust = 1), 
+          axis.text.y = element_text(face = "bold", size = 12),
+          strip.background = element_rect(fill = "black"),
+          strip.text = element_text(color = "white", face = "bold"),
+          plot.title = element_text(size = 18),
+          plot.subtitle = element_text(size = 15)) +
+  labs(x = "", y = "z-score of performance") +
+  ggtitle("Test Performance", subtitle = "Player Performance Standardized to the Team") +
+  ylim(-3, 3)
+```
+
+
+
+## Total Athleticism Score
+
+```{r echo = F, include = T}
+
+# create a TSA indicator for the z-score
+df$TSA_z_indicator <- with(df, ifelse(TSA_z > 0, "green", "red"))
+
+df %>% 
+  ggplot(aes(x = reorder(athlete, TSA_z), y = TSA_z)) +
+    geom_col(aes(fill = TSA_z_indicator), alpha = 0.8) +
+    geom_text(aes(label = round(TSA_z, 2)), vjust = "outside", angle = 90) +
+  theme_light() +
+  scale_fill_manual(values = c("green", "red"), name = "indicator") +
+    theme(axis.text.x = element_text(face = "bold", size = 12, angle = 60, vjust = 1, hjust = 1), 
+          axis.text.y = element_text(face = "bold", size = 12),
+          plot.title = element_text(size = 18),
+          plot.subtitle = element_text(size = 15)) +
+  labs(x = "Athlete", y = "z-score of performance") +
+  ggtitle("Total Score of Athletcism", subtitle = "Player Performance Standardized to the Team") +
+  ylim(-3, 3)
+
+```
+
+
+```{r echo = F, include = T}
+
+# Change data from a wide to long format
+
+df_long <- df %>% 
+    melt(., id = "athlete", measure.vars = c("cmj_t", "sprint_40_t", "bench_t", "five_ten_five_t"))
+
+# remove the _t
+
+df_long$Test <- str_sub(df_long$variable, end = -3)
+
+# plot
+df_long %>%
+  filter(athlete %in% c(3, 15, 22, 27)) %>%
+  ggplot(aes(x = Test, y = value)) +
+    geom_hline(yintercept = 50, size = 1.2, linetype = "dashed") +
+    geom_col(fill = "blue", alpha = 0.8) +
+    facet_wrap(~athlete)  +
+  theme_light() +
+    theme(axis.text.x = element_text(face = "bold", size = 12, angle = 45, vjust = 1, hjust = 1), 
+          axis.text.y = element_text(face = "bold", size = 12),
+          strip.background = element_rect(fill = "black"),
+          strip.text = element_text(color = "white", face = "bold")) +
+  labs(x = "", y = "t-score of performance")
+
+```
+
